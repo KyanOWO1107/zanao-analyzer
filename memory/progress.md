@@ -45,6 +45,10 @@
 - [x] User narrowed current match scope to learning resources and textbooks only: materials, question banks, course projects, lab reports, answers, second-hand books, textbooks.
 - [x] Removed current-scope matching for ride share, rental, and general second-hand items.
 - [x] Tightened contextual matching so exam discussion like `对答案` and course-project consultation like `课设容易挂吗` are not pushed.
+- [x] Created MVP baseline commit `4063587` after verifying `.env`, `@private/`, `Zanao-LLM-Analyzer/`, and `data/` are ignored.
+- [x] Added scan observability tables in the SQLite state database: `scan_runs` and `scan_matches`.
+- [x] Monitor runs now record scanned/matched/sent/duplicate counts and matched candidate status.
+- [x] Added `list-recent-matches` command to inspect recent matched candidates.
 
 ## Latest Verification
 
@@ -68,3 +72,9 @@
 - Current scoped-rule verification:
   - `python -m pytest tests -q` passed: 40 tests.
   - `python -m zanao_monitor.cli fetch-mini-list --limit 20 --match --state data\scope_rules.verify.db` returned `matched=0 sent=0 duplicates=0` on the latest 10 posts; previous ride-share and consultation false positives were no longer matched.
+- Current observability verification:
+  - `python -m pytest tests -q` passed: 44 tests.
+  - `python -m zanao_monitor.cli run-mini-monitor --limit 20 --state data\observability.verify.db` returned `scanned=10 matched=0 sent=0 duplicates=0`.
+  - `python -m zanao_monitor.cli list-recent-matches --state data\observability.verify.db --limit 5` returned `no recent matches`.
+  - `python -m zanao_monitor.cli monitor --posts examples\posts.sample.json --state data\observability.sample.verify.db` returned `scanned=3 matched=1 sent=1 duplicates=0`.
+  - `python -m zanao_monitor.cli list-recent-matches --state data\observability.sample.verify.db --limit 5` printed the sample `exam_paper` match.

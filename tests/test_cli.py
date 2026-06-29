@@ -3,7 +3,7 @@ import sqlite3
 
 import pytest
 
-from zanao_monitor.cli import build_parser, run_mini_monitor_once, safe_console_text, run_monitor, run_monitor_from_source
+from zanao_monitor.cli import build_parser, format_recent_matches, run_mini_monitor_once, safe_console_text, run_monitor, run_monitor_from_source
 from zanao_monitor.cli import load_feishu_config, run_monitor_with_posts
 from zanao_monitor.cli import format_posts_for_dry_run
 from zanao_monitor.models import Post
@@ -200,6 +200,35 @@ def test_run_monitor_with_posts_returns_matched_posts_without_mutating_state_in_
     assert duplicate.skipped_duplicate_count == 0
 
 
+def test_run_monitor_with_posts_records_scan_observability(tmp_path):
+    state_path = tmp_path / "state.db"
+    posts = [
+        Post(
+            source="zanao-mini",
+            post_id="p1",
+            title="求题库",
+            content="求这门课的题库和实验报告",
+            author="alice",
+            created_at=1710000000,
+        )
+    ]
+
+    result = run_monitor_with_posts(posts=posts, state_path=state_path, dry_run=True)
+
+    from zanao_monitor.state import NotificationState
+
+    state = NotificationState(state_path)
+    runs = state.list_recent_scan_runs(limit=1)
+    matches = state.list_recent_scan_matches(limit=1)
+
+    assert result.matched_count == 1
+    assert runs[0].scanned_count == 1
+    assert runs[0].matched_count == 1
+    assert runs[0].dry_run is True
+    assert matches[0].post_id == "p1"
+    assert matches[0].status == "preview"
+
+
 def test_load_feishu_config_reads_env_file_when_process_env_missing(tmp_path, monkeypatch):
     env_path = tmp_path / ".env"
     env_path.write_text(
@@ -259,6 +288,41 @@ def test_build_parser_allows_test_feishu_command():
 
     assert args.command == "test-feishu"
     assert args.env == ".env.local"
+
+
+def test_build_parser_allows_list_recent_matches_command():
+    parser = build_parser()
+
+    args = parser.parse_args(["list-recent-matches", "--state", "state.db", "--limit", "5"])
+
+    assert args.command == "list-recent-matches"
+    assert args.state == "state.db"
+    assert args.limit == 5
+
+
+def test_format_recent_matches_outputs_compact_rows(tmp_path):
+    state_path = tmp_path / "state.db"
+    run_monitor_with_posts(
+        posts=[
+            Post(
+                source="zanao-mini",
+                post_id="p1",
+                title="求题库",
+                content="求这门课题库答案",
+                author="alice",
+                created_at=1710000000,
+            )
+        ],
+        state_path=state_path,
+        dry_run=True,
+    )
+
+    output = format_recent_matches(state_path=state_path, limit=5)
+
+    assert "p1" in output
+    assert "求题库" in output
+    assert "course_resource" in output
+    assert "preview" in output
 
 
 def test_build_parser_allows_run_mini_monitor_command():

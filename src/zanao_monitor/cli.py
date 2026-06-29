@@ -78,6 +78,7 @@ def run_monitor_with_posts(
     sent_count = 0
     skipped_duplicate_count = 0
     matches_to_send: list[DemandMatch] = []
+    observed_matches: list[tuple[DemandMatch, str]] = []
 
     for post in posts:
         match = classify_post(post)
@@ -87,15 +88,18 @@ def run_monitor_with_posts(
 
         if state.was_sent(post.source, post.post_id):
             skipped_duplicate_count += 1
+            observed_matches.append((match, "duplicate"))
             continue
 
         if not dry_run and send_limit is not None and sent_count >= send_limit:
+            observed_matches.append((match, "limited"))
             continue
 
         message = build_text_message(match)
         if dry_run:
             sent_count += 1
             matches_to_send.append(match)
+            observed_matches.append((match, "preview"))
             continue
 
         if not dry_run:
@@ -109,14 +113,26 @@ def run_monitor_with_posts(
         state.mark_sent(post.source, post.post_id, match.category)
         sent_count += 1
         matches_to_send.append(match)
+        observed_matches.append((match, "sent"))
 
-    return RunResult(
+    result = RunResult(
         scanned_count=len(posts),
         matched_count=matched_count,
         sent_count=sent_count,
         skipped_duplicate_count=skipped_duplicate_count,
         matches_to_send=tuple(matches_to_send),
     )
+    run_id = state.record_scan_run(
+        scanned_count=result.scanned_count,
+        matched_count=result.matched_count,
+        sent_count=result.sent_count,
+        skipped_duplicate_count=result.skipped_duplicate_count,
+        dry_run=dry_run,
+        source="mixed" if not posts else posts[0].source,
+    )
+    for observed_match, status in observed_matches:
+        state.record_scan_match(run_id=run_id, match=observed_match, status=status)
+    return result
 
 
 def run_monitor(
@@ -209,6 +225,24 @@ def safe_print(text: str) -> None:
     print(safe_console_text(text))
 
 
+def format_recent_matches(state_path: str | Path, limit: int = 20) -> str:
+    state = NotificationState(state_path)
+    matches = state.list_recent_scan_matches(limit=limit)
+    if not matches:
+        return "no recent matches"
+
+    lines: list[str] = []
+    for match in matches:
+        keywords = ",".join(match.keywords)
+        lines.append(
+            "{0.created_at} | run={0.run_id} | {0.status} | {0.category} | {0.source}/{0.post_id} | {0.title} | {0.author} | {1}".format(
+                match,
+                keywords,
+            )
+        )
+    return "\n".join(lines)
+
+
 def _run_fetch_mini_list(args: argparse.Namespace) -> None:
     config = load_zanao_mini_config(args.env)
     client = ZanaoMiniClient(config)
@@ -288,6 +322,10 @@ def _run_test_feishu(args: argparse.Namespace) -> None:
     safe_print("feishu_test=sent")
 
 
+def _run_list_recent_matches(args: argparse.Namespace) -> None:
+    safe_print(format_recent_matches(state_path=args.state, limit=args.limit))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run Zanao demand monitor.")
     subparsers = parser.add_subparsers(dest="command")
@@ -328,6 +366,11 @@ def build_parser() -> argparse.ArgumentParser:
     test_feishu_parser = subparsers.add_parser("test-feishu", help="Send one harmless Feishu bot test message.")
     test_feishu_parser.add_argument("--env", default=".env", help="Path to local .env file.")
     test_feishu_parser.set_defaults(func=_run_test_feishu)
+
+    list_matches_parser = subparsers.add_parser("list-recent-matches", help="Print recent matched posts from state.")
+    list_matches_parser.add_argument("--state", default="data/monitor_state.db", help="Path to SQLite state database.")
+    list_matches_parser.add_argument("--limit", type=int, default=20, help="Maximum matches to print.")
+    list_matches_parser.set_defaults(func=_run_list_recent_matches)
 
     legacy_group = parser.add_mutually_exclusive_group(required=False)
     legacy_group.add_argument("--posts", help=argparse.SUPPRESS)

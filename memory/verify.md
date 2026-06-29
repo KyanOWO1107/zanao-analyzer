@@ -25,6 +25,11 @@ Latest completed checks:
 - `python -m zanao_monitor.cli run-mini-monitor --limit 20 --state data\monitor_state.db` returned `scanned=10 matched=1 sent=0 duplicates=1`.
 - `python -m pytest tests -q` passed: 40 tests after narrowing rules to learning resources and textbooks.
 - `python -m zanao_monitor.cli fetch-mini-list --limit 20 --match --state data\scope_rules.verify.db` returned `matched=0 sent=0 duplicates=0` on the latest 10 posts; ride-share and consultation false positives were no longer matched.
+- `python -m pytest tests -q` passed: 44 tests after adding scan observability.
+- `python -m zanao_monitor.cli run-mini-monitor --limit 20 --state data\observability.verify.db` returned `scanned=10 matched=0 sent=0 duplicates=0`.
+- `python -m zanao_monitor.cli list-recent-matches --state data\observability.verify.db --limit 5` returned `no recent matches`.
+- `python -m zanao_monitor.cli monitor --posts examples\posts.sample.json --state data\observability.sample.verify.db` returned `scanned=3 matched=1 sent=1 duplicates=0`.
+- `python -m zanao_monitor.cli list-recent-matches --state data\observability.sample.verify.db --limit 5` printed the sample `exam_paper` match.
 
 Runtime note:
 

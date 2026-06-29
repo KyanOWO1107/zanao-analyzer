@@ -98,3 +98,11 @@ python -m zanao_monitor.cli run-mini-monitor --limit 20 --send --send-limit 1 --
 ```
 
 它只输出汇总计数，适合写入计划任务或云端 cron 日志。
+
+查看最近命中过的候选：
+
+```bash
+python -m zanao_monitor.cli list-recent-matches --state data/monitor_state.db --limit 20
+```
+
+每次监控运行都会在状态库里记录扫描汇总和命中候选，便于之后观察误报、漏报和推送效果。

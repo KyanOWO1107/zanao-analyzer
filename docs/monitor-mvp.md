@@ -52,3 +52,26 @@ python -m zanao_monitor.cli run-mini-monitor --limit 20 --send --send-limit 1 --
 ```
 
 该命令只输出 `scanned/matched/sent/duplicates` 汇总，便于日志观察；默认不传 `--send` 时不会发飞书，也不会写入去重状态。
+
+## Observability
+
+每次监控运行会记录：
+
+- 扫描数量。
+- 命中数量。
+- 推送数量。
+- 重复跳过数量。
+- 命中候选的标题、作者、类别、关键词和状态。
+
+查看最近命中：
+
+```bash
+python -m zanao_monitor.cli list-recent-matches --state data/monitor_state.db --limit 20
+```
+
+命中状态包括：
+
+- `preview`: dry-run 中会被推送的候选。
+- `sent`: 已真实推送并写入去重状态。
+- `duplicate`: 已推送过，本次跳过。
+- `limited`: 命中但超过本次 `--send-limit`，本次未推送。
