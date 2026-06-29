@@ -33,6 +33,9 @@ Latest completed checks:
 - `python -m pytest tests\test_scripts.py -q` passed: 2 tests after adding Windows/Linux scheduled-run scripts and documentation.
 - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\run_monitor.ps1 -Limit 20 -SendLimit 0 -State data\scheduled_windows.verify.db` completed and wrote `scanned=10 matched=0 sent=0 duplicates=0` to `logs\monitor.log`.
 - `git check-ignore -v logs/ data/ .env @private/ Zanao-LLM-Analyzer/` confirmed generated/sensitive paths are ignored.
+- `python -m pytest tests -q` passed: 48 tests after adding watch mode.
+- `python -m zanao_monitor.cli watch-mini-monitor --limit 5 --dry-run --interval-seconds 1 --max-cycles 2 --state data\watch_cli.verify.db` printed two dry-run cycles.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\run_monitor.ps1 -Watch -IntervalSeconds 1 -MaxCycles 2 -SendLimit 0 -State data\watch_windows.verify.db` completed and wrote two cycles to `logs\monitor.log`.
 
 Runtime note:
 

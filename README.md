@@ -123,3 +123,13 @@ scripts/run_monitor.sh
 ```
 
 它们默认扫描最近 20 条、真实推送、每次最多推送 1 条，并把日志追加到 `logs/monitor.log`。
+
+脚本默认是执行一次后退出，适合 Windows 任务计划程序或 Linux cron。需要保持监视状态时使用 watch 模式：
+
+```powershell
+.\scripts\run_monitor.ps1 -Watch
+```
+
+```bash
+WATCH=1 ./scripts/run_monitor.sh
+```

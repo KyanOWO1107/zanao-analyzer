@@ -10,8 +10,11 @@ def test_scheduler_scripts_use_mini_monitor_send_command():
 
     for script in (windows_script, linux_script):
         assert "run-mini-monitor" in script
+        assert "watch-mini-monitor" in script
         assert "--send" in script
         assert "--send-limit" in script
+        assert "--interval-seconds" in script
+        assert "--max-cycles" in script
         assert "FEISHU_WEBHOOK" not in script
         assert "ZANAO_USER_TOKEN" not in script
 

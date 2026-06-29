@@ -20,6 +20,8 @@ PowerShell 脚本：
 .\scripts\run_monitor.ps1
 ```
 
+这个脚本默认执行一次后退出，适合任务计划程序重复调用。
+
 默认行为：
 
 - 扫描最近 20 条。
@@ -33,6 +35,20 @@ PowerShell 脚本：
 
 ```powershell
 .\scripts\run_monitor.ps1 -Limit 50 -SendLimit 1 -State "data\monitor_state.db" -EnvFile ".env"
+```
+
+保持监视状态：
+
+```powershell
+.\scripts\run_monitor.ps1 -Watch -IntervalSeconds 600
+```
+
+该命令会一直运行，每 600 秒扫描一次。检测到新的符合规则内容时，会推送给飞书机器人并写入去重状态。
+
+测试 watch 模式但只跑两轮：
+
+```powershell
+.\scripts\run_monitor.ps1 -Watch -IntervalSeconds 5 -MaxCycles 2 -SendLimit 0
 ```
 
 创建 Windows 任务计划程序任务，每 10 分钟运行一次：
@@ -67,10 +83,26 @@ chmod +x scripts/run_monitor.sh
 ./scripts/run_monitor.sh
 ```
 
+默认执行一次后退出，适合 cron 重复调用。
+
 可以通过环境变量覆盖参数：
 
 ```bash
 LIMIT=50 SEND_LIMIT=1 STATE=data/monitor_state.db ENV_FILE=.env ./scripts/run_monitor.sh
+```
+
+保持监视状态：
+
+```bash
+WATCH=1 INTERVAL_SECONDS=600 ./scripts/run_monitor.sh
+```
+
+该命令会一直运行，每 600 秒扫描一次。检测到新的符合规则内容时，会推送给飞书机器人并写入去重状态。
+
+测试 watch 模式但只跑两轮：
+
+```bash
+WATCH=1 INTERVAL_SECONDS=5 MAX_CYCLES=2 SEND_LIMIT=0 ./scripts/run_monitor.sh
 ```
 
 ### crontab

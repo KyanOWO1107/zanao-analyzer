@@ -2,6 +2,8 @@ import argparse
 import json
 import os
 import sys
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -204,6 +206,40 @@ def run_mini_monitor_once(
     )
 
 
+def run_watch_mini_monitor(
+    client: ZanaoMiniClient,
+    state_path: str | Path,
+    limit: int,
+    from_time: int,
+    interval_seconds: int,
+    dry_run: bool,
+    webhook_url: str | None = None,
+    webhook_secret: str | None = None,
+    send_limit: int | None = None,
+    max_cycles: int | None = None,
+    sleep_func: Callable[[int], object] = time.sleep,
+) -> list[RunResult]:
+    results: list[RunResult] = []
+    cycle = 0
+    while max_cycles is None or cycle < max_cycles:
+        result = run_mini_monitor_once(
+            client=client,
+            state_path=state_path,
+            limit=limit,
+            from_time=from_time,
+            dry_run=dry_run,
+            webhook_url=webhook_url,
+            webhook_secret=webhook_secret,
+            send_limit=send_limit,
+        )
+        results.append(result)
+        cycle += 1
+        if max_cycles is not None and cycle >= max_cycles:
+            break
+        sleep_func(interval_seconds)
+    return results
+
+
 def format_posts_for_dry_run(posts: list[Post]) -> str:
     lines: list[str] = []
     for index, post in enumerate(posts, start=1):
@@ -310,6 +346,35 @@ def _run_mini_monitor_command(args: argparse.Namespace) -> None:
     )
 
 
+def _run_watch_mini_monitor_command(args: argparse.Namespace) -> None:
+    config = load_zanao_mini_config(args.env)
+    client = ZanaoMiniClient(config)
+    feishu_config = load_feishu_config(args.env) if not args.dry_run else None
+
+    cycle = 0
+    while True:
+        result = run_mini_monitor_once(
+            client=client,
+            state_path=args.state,
+            limit=args.limit,
+            from_time=args.from_time,
+            dry_run=args.dry_run,
+            webhook_url=feishu_config.webhook_url if feishu_config else None,
+            webhook_secret=feishu_config.webhook_secret if feishu_config else None,
+            send_limit=args.send_limit,
+        )
+        cycle += 1
+        safe_print(
+            "cycle={0} scanned={1.scanned_count} matched={1.matched_count} sent={1.sent_count} duplicates={1.skipped_duplicate_count}".format(
+                cycle,
+                result,
+            )
+        )
+        if args.max_cycles is not None and cycle >= args.max_cycles:
+            break
+        time.sleep(args.interval_seconds)
+
+
 def _run_test_feishu(args: argparse.Namespace) -> None:
     feishu_config = load_feishu_config(args.env)
     message = build_plain_text_message("赞噢监测机器人测试消息：如果你看到这条消息，说明 Feishu webhook 配置可用。")
@@ -362,6 +427,20 @@ def build_parser() -> argparse.ArgumentParser:
     mini_monitor_parser.add_argument("--send", action="store_true", help="Send real Feishu messages.")
     mini_monitor_parser.add_argument("--send-limit", type=int, default=1, help="Maximum real Feishu messages to send.")
     mini_monitor_parser.set_defaults(func=_run_mini_monitor_command)
+
+    watch_parser = subparsers.add_parser(
+        "watch-mini-monitor",
+        help="Keep polling mini-program posts and push new matches.",
+    )
+    watch_parser.add_argument("--env", default=".env", help="Path to local .env file.")
+    watch_parser.add_argument("--state", default="data/monitor_state.db", help="Path to SQLite state database.")
+    watch_parser.add_argument("--limit", type=int, default=20, help="Maximum posts to scan per cycle.")
+    watch_parser.add_argument("--from-time", type=int, default=0, help="Zanao from_time pagination value.")
+    watch_parser.add_argument("--interval-seconds", type=int, default=600, help="Seconds between monitor cycles.")
+    watch_parser.add_argument("--send-limit", type=int, default=1, help="Maximum real Feishu messages to send per cycle.")
+    watch_parser.add_argument("--dry-run", action="store_true", help="Do not send Feishu messages or mark sent.")
+    watch_parser.add_argument("--max-cycles", type=int, default=None, help=argparse.SUPPRESS)
+    watch_parser.set_defaults(func=_run_watch_mini_monitor_command)
 
     test_feishu_parser = subparsers.add_parser("test-feishu", help="Send one harmless Feishu bot test message.")
     test_feishu_parser.add_argument("--env", default=".env", help="Path to local .env file.")

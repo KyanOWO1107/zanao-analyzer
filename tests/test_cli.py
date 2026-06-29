@@ -3,7 +3,7 @@ import sqlite3
 
 import pytest
 
-from zanao_monitor.cli import build_parser, format_recent_matches, run_mini_monitor_once, safe_console_text, run_monitor, run_monitor_from_source
+from zanao_monitor.cli import build_parser, format_recent_matches, run_mini_monitor_once, run_watch_mini_monitor, safe_console_text, run_monitor, run_monitor_from_source
 from zanao_monitor.cli import load_feishu_config, run_monitor_with_posts
 from zanao_monitor.cli import format_posts_for_dry_run
 from zanao_monitor.models import Post
@@ -349,6 +349,73 @@ def test_build_parser_allows_run_mini_monitor_command():
     assert args.limit == 15
     assert args.send is True
     assert args.send_limit == 2
+
+
+def test_build_parser_allows_watch_mini_monitor_command():
+    parser = build_parser()
+
+    args = parser.parse_args(
+        [
+            "watch-mini-monitor",
+            "--env",
+            ".env.local",
+            "--state",
+            "state.db",
+            "--limit",
+            "15",
+            "--interval-seconds",
+            "30",
+            "--send-limit",
+            "2",
+        ]
+    )
+
+    assert args.command == "watch-mini-monitor"
+    assert args.env == ".env.local"
+    assert args.state == "state.db"
+    assert args.limit == 15
+    assert args.interval_seconds == 30
+    assert args.send_limit == 2
+
+
+def test_run_watch_mini_monitor_repeats_until_max_cycles(tmp_path):
+    state_path = tmp_path / "state.db"
+    sleep_calls = []
+
+    class FakeClient:
+        def __init__(self):
+            self.calls = 0
+
+        def fetch_thread_list(self, limit, from_time=0):
+            self.calls += 1
+            return [
+                Post(
+                    source="zanao-mini",
+                    post_id=f"p{self.calls}",
+                    title="求真题",
+                    content="求高数真题",
+                    author="alice",
+                    created_at=1710000000 + self.calls,
+                )
+            ]
+
+    client = FakeClient()
+
+    results = run_watch_mini_monitor(
+        client=client,
+        state_path=state_path,
+        limit=10,
+        from_time=0,
+        interval_seconds=5,
+        dry_run=True,
+        max_cycles=3,
+        sleep_func=sleep_calls.append,
+    )
+
+    assert client.calls == 3
+    assert len(results) == 3
+    assert [result.matched_count for result in results] == [1, 1, 1]
+    assert sleep_calls == [5, 5]
 
 
 def test_run_mini_monitor_once_uses_client_posts_in_dry_run_without_feishu(tmp_path):

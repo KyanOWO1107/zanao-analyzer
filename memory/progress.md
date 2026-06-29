@@ -52,6 +52,9 @@
 - [x] Added Windows scheduler script: `scripts/run_monitor.ps1`.
 - [x] Added Linux scheduler script: `scripts/run_monitor.sh`.
 - [x] Added Windows Task Scheduler, Linux crontab, and Linux systemd timer documentation in `docs/scheduled-run.md`.
+- [x] Added long-running `watch-mini-monitor` CLI command for continuous monitoring.
+- [x] Added Windows watch mode: `scripts/run_monitor.ps1 -Watch`.
+- [x] Added Linux watch mode: `WATCH=1 ./scripts/run_monitor.sh`.
 
 ## Latest Verification
 
@@ -86,3 +89,7 @@
   - `python -m pytest tests -q` passed: 46 tests.
   - Windows scheduler script completed with `SendLimit=0` and wrote monitor summary to `logs\monitor.log`.
   - `logs/`, `data/`, `.env`, `@private/`, and `Zanao-LLM-Analyzer/` ignore rules were verified with `git check-ignore`.
+- Current watch-mode verification:
+  - `python -m pytest tests -q` passed: 48 tests.
+  - `python -m zanao_monitor.cli watch-mini-monitor --limit 5 --dry-run --interval-seconds 1 --max-cycles 2 --state data\watch_cli.verify.db` printed two cycles.
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\run_monitor.ps1 -Watch -IntervalSeconds 1 -MaxCycles 2 -SendLimit 0 -State data\watch_windows.verify.db` completed and wrote two cycles to `logs\monitor.log`.
