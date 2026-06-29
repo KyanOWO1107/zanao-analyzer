@@ -1,0 +1,2 @@
+"""Zanao campus market monitor."""
+

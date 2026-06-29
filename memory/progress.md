@@ -1,0 +1,70 @@
+# Progress
+
+- [x] Detected that `memory/` did not exist and initialized persistent state files.
+- [x] Inspect `Zanao-LLM-Analyzer` repository structure.
+- [x] Read README, dependency files, configuration examples, and source entry points.
+- [x] Confirmed main project is a Python 3.11-oriented crawler/analyzer/API stack with Redis, SQLite, Hugging Face models, Ollama, and FastAPI.
+- [x] Confirmed bundled SQLite data exists: 340 inschool posts, 2523 inschool comments, 49 outschool threads, 204 outschool comments, and 3116 base analysis rows.
+- [x] Noted usage risks: config placeholders remain, `wx_login/main.py` has hardcoded user key/path, top-level analyzer imports expect `config` to be importable, and README API startup command may fail from project root.
+- [x] Summarize project purpose, architecture, and usage.
+- [x] Draft follow-up plan for the user's campus market monitoring goal.
+- [x] User selected Feishu bot as the first push channel.
+- [x] Started a clean `zanao-monitor` project outside the cloned reference repo.
+- [x] Added TDD-covered MVP modules for demand rules, Feishu message/signing, notification state, and dry-run CLI.
+- [x] Verify CLI runtime with sample data.
+- [x] Added SQLite source support for `Zanao-LLM-Analyzer/data/zanao_detailed_info/inschool_posts_and_comments.db`.
+- [x] Connected SQLite source to CLI through `--inschool-db` and `--limit`.
+- [x] Removed `Any` type usage from MVP production code.
+- [x] User clarified scope: only monitor one school; no cross-school collection needed.
+- [x] User clarified reference SQLite data is not their school, so it is for schema/testing only.
+- [x] Added a safe guide for obtaining the user's own school Zanao request parameters.
+- [x] Initialized Git for the workspace and ignored `Zanao-LLM-Analyzer/`, `@private/`, `.env`, and generated files.
+- [x] Analyzed private capture samples in a redacted way.
+- [x] Documented app vs mini-program endpoint differences in `docs/capture-analysis.md`.
+- [x] Added `.env.example` and `docs/env-fields.md` for mapping mini-program capture headers to local configuration.
+- [x] Verified `ZANAO_API_SALT` by reproducing 4 captured mini-program `X-Sc-Ah` signatures.
+- [x] Added tested `make_x_sc_ah` signing helper.
+- [x] Filled local ignored `.env` with verified `ZANAO_API_SALT`.
+- [x] Added tested `.env` config loader for mini-program API.
+- [x] Added tested mini-program `/thread/v2/list` client.
+- [x] Added CLI command `fetch-mini-list`.
+- [x] Verified real mini-program dry-run: `python -m zanao_monitor.cli fetch-mini-list --limit 3` returned 3 posts.
+- [x] Connected real mini-program list fetch to rules and dedupe preview via `fetch-mini-list --match`.
+- [x] Changed dry-run semantics so preview does not mutate notification state.
+- [x] Verified real `fetch-mini-list --limit 20 --match` preview twice; both runs showed the same candidate and no duplicate skip because dry-run does not write state.
+- [x] Added Feishu fixed test command: `python -m zanao_monitor.cli test-feishu`.
+- [x] Added `.env` fallback loading for Feishu webhook config, with process environment taking priority.
+- [x] Added `--send-limit` to real send paths; default is `1` to prevent accidental bulk push.
+- [x] Added Feishu webhook JSON body validation so HTTP 200 with bot error code fails loudly.
+- [x] Fixed Windows console preview output when Zanao post text contains emoji or other characters unsupported by GBK.
+- [x] User confirmed receiving the Feishu fixed test message.
+- [x] Verified controlled real Feishu push with `fetch-mini-list --match --send --send-limit 1`.
+- [x] Verified dedupe after real push: same state DB showed `matched=1 sent=0 duplicates=1`.
+- [x] Added quiet scheduler-friendly command: `run-mini-monitor`.
+- [x] Documented `run-mini-monitor` for Windows Task Scheduler or cloud cron usage.
+- [x] User narrowed current match scope to learning resources and textbooks only: materials, question banks, course projects, lab reports, answers, second-hand books, textbooks.
+- [x] Removed current-scope matching for ride share, rental, and general second-hand items.
+- [x] Tightened contextual matching so exam discussion like `对答案` and course-project consultation like `课设容易挂吗` are not pushed.
+
+## Latest Verification
+
+- `python -m pip install -e ".[dev]"` succeeded after removing the console script entry from `pyproject.toml`.
+- `python -m pytest tests -q` passed: 9 tests.
+- CLI dry-run with `examples/posts.sample.json` passed:
+  - First run: `scanned=3 matched=2 sent=2 duplicates=0`
+  - Second run: `scanned=3 matched=2 sent=0 duplicates=2`
+- After SQLite source integration:
+  - `python -m pytest tests -q` passed: 13 tests.
+  - CLI dry-run with reference inschool SQLite DB and `--limit 50` passed:
+    - First run: `scanned=50 matched=4 sent=4 duplicates=0`
+    - Second run: `scanned=50 matched=4 sent=0 duplicates=4`
+- Current Feishu/send guard verification:
+  - `python -m pytest tests -q` passed: 33 tests.
+  - `python -m zanao_monitor.cli test-feishu` returned `feishu_test=sent`.
+  - `python -m zanao_monitor.cli fetch-mini-list --limit 10 --match --state data\mini_match.verify.db` returned 10 posts and 1 push candidate without mutating state.
+  - `python -m zanao_monitor.cli fetch-mini-list --limit 20 --match --send --send-limit 1 --state data\monitor_state.db` sent 1 real Feishu message.
+  - `python -m zanao_monitor.cli fetch-mini-list --limit 20 --match --state data\monitor_state.db` then returned `matched=1 sent=0 duplicates=1`.
+  - `python -m zanao_monitor.cli run-mini-monitor --limit 20 --state data\monitor_state.db` returned `scanned=10 matched=1 sent=0 duplicates=1`.
+- Current scoped-rule verification:
+  - `python -m pytest tests -q` passed: 40 tests.
+  - `python -m zanao_monitor.cli fetch-mini-list --limit 20 --match --state data\scope_rules.verify.db` returned `matched=0 sent=0 duplicates=0` on the latest 10 posts; previous ride-share and consultation false positives were no longer matched.

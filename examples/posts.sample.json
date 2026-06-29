@@ -1,0 +1,27 @@
+[
+  {
+    "source": "sample",
+    "post_id": "demo-1",
+    "title": "求高数 A 往年真题",
+    "content": "有没有期末真题和答案，电子版也可以，谢谢。",
+    "author": "alice",
+    "created_at": 1710000000
+  },
+  {
+    "source": "sample",
+    "post_id": "demo-2",
+    "title": "出二手显示器",
+    "content": "毕业出 24 寸显示器，价格可聊。",
+    "author": "bob",
+    "created_at": 1710000300
+  },
+  {
+    "source": "sample",
+    "post_id": "demo-3",
+    "title": "今天食堂不错",
+    "content": "晚饭窗口排队有点久，但是味道还行。",
+    "author": "carol",
+    "created_at": 1710000600
+  }
+]
+

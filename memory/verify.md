@@ -1,0 +1,31 @@
+# Verification
+
+Current phase is MVP implementation.
+
+Required checks before claiming implementation completion later:
+
+- Run available project tests, type checks, or lint checks if present.
+- Run the relevant script or workflow locally when credentials and safe inputs are available.
+- For notification or scraping behavior, verify with a dry-run path before live operation.
+- Do not claim runtime behavior works if required credentials, cookies, API keys, or network access are missing.
+
+Latest completed checks:
+
+- `python -m pip install -e ".[dev]"`.
+- `python -m pytest tests -q`.
+- `python -m zanao_monitor.cli --posts examples\posts.sample.json --state data\monitor_state.verify.db` twice to verify dry-run and duplicate skipping.
+- `python -m zanao_monitor.cli --inschool-db Zanao-LLM-Analyzer\data\zanao_detailed_info\inschool_posts_and_comments.db --state data\monitor_state.verify.db --limit 50` twice to verify SQLite source integration and duplicate skipping.
+- `python -m zanao_monitor.cli fetch-mini-list --limit 3` returned 3 posts from the configured mini-program API.
+- `python -m zanao_monitor.cli fetch-mini-list --limit 20 --match --state data\mini_match.verify.db` run twice; dry-run preview returned one candidate each time and did not mutate dedupe state.
+- `python -m pytest tests -q` passed: 33 tests.
+- `python -m zanao_monitor.cli test-feishu` returned `feishu_test=sent`.
+- `python -m zanao_monitor.cli fetch-mini-list --limit 10 --match --state data\mini_match.verify.db` returned 10 posts and 1 push candidate without mutating state.
+- `python -m zanao_monitor.cli fetch-mini-list --limit 20 --match --send --send-limit 1 --state data\monitor_state.db` sent 1 real Feishu message.
+- `python -m zanao_monitor.cli fetch-mini-list --limit 20 --match --state data\monitor_state.db` then returned `matched=1 sent=0 duplicates=1`.
+- `python -m zanao_monitor.cli run-mini-monitor --limit 20 --state data\monitor_state.db` returned `scanned=10 matched=1 sent=0 duplicates=1`.
+- `python -m pytest tests -q` passed: 40 tests after narrowing rules to learning resources and textbooks.
+- `python -m zanao_monitor.cli fetch-mini-list --limit 20 --match --state data\scope_rules.verify.db` returned `matched=0 sent=0 duplicates=0` on the latest 10 posts; ride-share and consultation false positives were no longer matched.
+
+Runtime note:
+
+- Windows PowerShell may use GBK/CP936 stdout. CLI preview output now escapes unsupported characters such as emoji instead of crashing with `UnicodeEncodeError`.
