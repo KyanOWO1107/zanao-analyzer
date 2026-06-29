@@ -30,6 +30,9 @@ Latest completed checks:
 - `python -m zanao_monitor.cli list-recent-matches --state data\observability.verify.db --limit 5` returned `no recent matches`.
 - `python -m zanao_monitor.cli monitor --posts examples\posts.sample.json --state data\observability.sample.verify.db` returned `scanned=3 matched=1 sent=1 duplicates=0`.
 - `python -m zanao_monitor.cli list-recent-matches --state data\observability.sample.verify.db --limit 5` printed the sample `exam_paper` match.
+- `python -m pytest tests\test_scripts.py -q` passed: 2 tests after adding Windows/Linux scheduled-run scripts and documentation.
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\run_monitor.ps1 -Limit 20 -SendLimit 0 -State data\scheduled_windows.verify.db` completed and wrote `scanned=10 matched=0 sent=0 duplicates=0` to `logs\monitor.log`.
+- `git check-ignore -v logs/ data/ .env @private/ Zanao-LLM-Analyzer/` confirmed generated/sensitive paths are ignored.
 
 Runtime note:
 

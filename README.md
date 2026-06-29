@@ -106,3 +106,20 @@ python -m zanao_monitor.cli list-recent-matches --state data/monitor_state.db --
 ```
 
 每次监控运行都会在状态库里记录扫描汇总和命中候选，便于之后观察误报、漏报和推送效果。
+
+## 定时运行
+
+Windows 和 Linux 的定时运行方式见：
+
+```text
+docs/scheduled-run.md
+```
+
+仓库提供两个脚本：
+
+```text
+scripts/run_monitor.ps1
+scripts/run_monitor.sh
+```
+
+它们默认扫描最近 20 条、真实推送、每次最多推送 1 条，并把日志追加到 `logs/monitor.log`。

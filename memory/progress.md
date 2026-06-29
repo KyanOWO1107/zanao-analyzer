@@ -49,6 +49,9 @@
 - [x] Added scan observability tables in the SQLite state database: `scan_runs` and `scan_matches`.
 - [x] Monitor runs now record scanned/matched/sent/duplicate counts and matched candidate status.
 - [x] Added `list-recent-matches` command to inspect recent matched candidates.
+- [x] Added Windows scheduler script: `scripts/run_monitor.ps1`.
+- [x] Added Linux scheduler script: `scripts/run_monitor.sh`.
+- [x] Added Windows Task Scheduler, Linux crontab, and Linux systemd timer documentation in `docs/scheduled-run.md`.
 
 ## Latest Verification
 
@@ -78,3 +81,8 @@
   - `python -m zanao_monitor.cli list-recent-matches --state data\observability.verify.db --limit 5` returned `no recent matches`.
   - `python -m zanao_monitor.cli monitor --posts examples\posts.sample.json --state data\observability.sample.verify.db` returned `scanned=3 matched=1 sent=1 duplicates=0`.
   - `python -m zanao_monitor.cli list-recent-matches --state data\observability.sample.verify.db --limit 5` printed the sample `exam_paper` match.
+- Current scheduled-run verification:
+  - `python -m pytest tests\test_scripts.py -q` passed: 2 tests.
+  - `python -m pytest tests -q` passed: 46 tests.
+  - Windows scheduler script completed with `SendLimit=0` and wrote monitor summary to `logs\monitor.log`.
+  - `logs/`, `data/`, `.env`, `@private/`, and `Zanao-LLM-Analyzer/` ignore rules were verified with `git check-ignore`.
