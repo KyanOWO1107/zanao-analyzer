@@ -55,6 +55,11 @@
 - [x] Added long-running `watch-mini-monitor` CLI command for continuous monitoring.
 - [x] Added Windows watch mode: `scripts/run_monitor.ps1 -Watch`.
 - [x] Added Linux watch mode: `WATCH=1 ./scripts/run_monitor.sh`.
+- [x] Added optional remote AI second-pass review, disabled by default.
+- [x] AI review supports OpenAI-compatible Chat Completions APIs through `.env` values.
+- [x] AI review only receives rule-hit post context, not Zanao auth headers, Feishu webhook, salt, or tokens.
+- [x] AI rejection and AI errors are recorded as `ai_rejected` / `ai_error` and are not pushed.
+- [x] Documented QQ bot integration options; implementation waits for the actual bot HTTP/API contract from the other department or LLBot/AstrBot setup.
 
 ## Latest Verification
 
@@ -93,3 +98,6 @@
   - `python -m pytest tests -q` passed: 48 tests.
   - `python -m zanao_monitor.cli watch-mini-monitor --limit 5 --dry-run --interval-seconds 1 --max-cycles 2 --state data\watch_cli.verify.db` printed two cycles.
   - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\run_monitor.ps1 -Watch -IntervalSeconds 1 -MaxCycles 2 -SendLimit 0 -State data\watch_windows.verify.db` completed and wrote two cycles to `logs\monitor.log`.
+- Current AI review verification:
+  - `python -m pytest tests -q` passed: 57 tests.
+  - `python -m zanao_monitor.cli run-mini-monitor --limit 5 --state data\ai_default.verify.db` returned `scanned=5 matched=0 sent=0 duplicates=0` with AI disabled by default.

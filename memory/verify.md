@@ -36,6 +36,8 @@ Latest completed checks:
 - `python -m pytest tests -q` passed: 48 tests after adding watch mode.
 - `python -m zanao_monitor.cli watch-mini-monitor --limit 5 --dry-run --interval-seconds 1 --max-cycles 2 --state data\watch_cli.verify.db` printed two dry-run cycles.
 - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\run_monitor.ps1 -Watch -IntervalSeconds 1 -MaxCycles 2 -SendLimit 0 -State data\watch_windows.verify.db` completed and wrote two cycles to `logs\monitor.log`.
+- `python -m pytest tests -q` passed: 57 tests after adding optional AI review.
+- `python -m zanao_monitor.cli run-mini-monitor --limit 5 --state data\ai_default.verify.db` returned `scanned=5 matched=0 sent=0 duplicates=0` with AI disabled by default.
 
 Runtime note:
 

@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+from zanao_monitor.ai import AiReview, build_ai_reviewer, load_ai_config
 from zanao_monitor.config import load_zanao_mini_config, read_env_file
 from zanao_monitor.feishu import (
     build_plain_text_message,
@@ -45,6 +46,12 @@ def load_feishu_config(env_path: str | Path = ".env") -> FeishuConfig:
     return FeishuConfig(webhook_url=webhook_url, webhook_secret=webhook_secret)
 
 
+def load_ai_reviewer(env_path: str | Path = ".env") -> tuple[Callable[[DemandMatch], AiReview] | None, float]:
+    config = load_ai_config(env_path)
+    reviewer = build_ai_reviewer(config)
+    return reviewer.review if reviewer is not None else None, config.confidence_threshold
+
+
 def _load_posts(posts_path: str | Path) -> list[Post]:
     raw = json.loads(Path(posts_path).read_text(encoding="utf-8"))
     if not isinstance(raw, list):
@@ -74,6 +81,8 @@ def run_monitor_with_posts(
     webhook_url: str | None = None,
     webhook_secret: str | None = None,
     send_limit: int | None = None,
+    ai_reviewer: Callable[[DemandMatch], AiReview] | None = None,
+    ai_confidence_threshold: float = 0.7,
 ) -> RunResult:
     state = NotificationState(state_path)
     matched_count = 0
@@ -96,6 +105,16 @@ def run_monitor_with_posts(
         if not dry_run and send_limit is not None and sent_count >= send_limit:
             observed_matches.append((match, "limited"))
             continue
+
+        if ai_reviewer is not None:
+            try:
+                review = ai_reviewer(match)
+            except Exception:
+                observed_matches.append((match, "ai_error"))
+                continue
+            if not review.is_target or review.confidence < ai_confidence_threshold:
+                observed_matches.append((match, "ai_rejected"))
+                continue
 
         message = build_text_message(match)
         if dry_run:
@@ -144,6 +163,8 @@ def run_monitor(
     webhook_url: str | None = None,
     webhook_secret: str | None = None,
     send_limit: int | None = None,
+    ai_reviewer: Callable[[DemandMatch], AiReview] | None = None,
+    ai_confidence_threshold: float = 0.7,
 ) -> RunResult:
     return run_monitor_with_posts(
         posts=posts,
@@ -152,6 +173,8 @@ def run_monitor(
         webhook_url=webhook_url,
         webhook_secret=webhook_secret,
         send_limit=send_limit,
+        ai_reviewer=ai_reviewer,
+        ai_confidence_threshold=ai_confidence_threshold,
     )
 
 
@@ -164,6 +187,8 @@ def run_monitor_from_source(
     webhook_url: str | None = None,
     webhook_secret: str | None = None,
     send_limit: int | None = None,
+    ai_reviewer: Callable[[DemandMatch], AiReview] | None = None,
+    ai_confidence_threshold: float = 0.7,
 ) -> RunResult:
     if posts_path and inschool_db_path:
         raise ValueError("choose either posts_path or inschool_db_path")
@@ -182,6 +207,8 @@ def run_monitor_from_source(
         webhook_url=webhook_url,
         webhook_secret=webhook_secret,
         send_limit=send_limit,
+        ai_reviewer=ai_reviewer,
+        ai_confidence_threshold=ai_confidence_threshold,
     )
 
 
@@ -194,6 +221,8 @@ def run_mini_monitor_once(
     webhook_url: str | None = None,
     webhook_secret: str | None = None,
     send_limit: int | None = None,
+    ai_reviewer: Callable[[DemandMatch], AiReview] | None = None,
+    ai_confidence_threshold: float = 0.7,
 ) -> RunResult:
     posts = client.fetch_thread_list(limit=limit, from_time=from_time)
     return run_monitor_with_posts(
@@ -203,6 +232,8 @@ def run_mini_monitor_once(
         webhook_url=webhook_url,
         webhook_secret=webhook_secret,
         send_limit=send_limit,
+        ai_reviewer=ai_reviewer,
+        ai_confidence_threshold=ai_confidence_threshold,
     )
 
 
@@ -216,6 +247,8 @@ def run_watch_mini_monitor(
     webhook_url: str | None = None,
     webhook_secret: str | None = None,
     send_limit: int | None = None,
+    ai_reviewer: Callable[[DemandMatch], AiReview] | None = None,
+    ai_confidence_threshold: float = 0.7,
     max_cycles: int | None = None,
     sleep_func: Callable[[int], object] = time.sleep,
 ) -> list[RunResult]:
@@ -231,6 +264,8 @@ def run_watch_mini_monitor(
             webhook_url=webhook_url,
             webhook_secret=webhook_secret,
             send_limit=send_limit,
+            ai_reviewer=ai_reviewer,
+            ai_confidence_threshold=ai_confidence_threshold,
         )
         results.append(result)
         cycle += 1
@@ -288,6 +323,7 @@ def _run_fetch_mini_list(args: argparse.Namespace) -> None:
         safe_print(format_posts_for_dry_run(posts))
     if args.match:
         feishu_config = load_feishu_config(args.env) if args.send else None
+        ai_reviewer, ai_threshold = load_ai_reviewer(args.env)
         result = run_monitor_with_posts(
             posts=posts,
             state_path=args.state,
@@ -295,6 +331,8 @@ def _run_fetch_mini_list(args: argparse.Namespace) -> None:
             webhook_url=feishu_config.webhook_url if feishu_config else None,
             webhook_secret=feishu_config.webhook_secret if feishu_config else None,
             send_limit=args.send_limit,
+            ai_reviewer=ai_reviewer,
+            ai_confidence_threshold=ai_threshold,
         )
         safe_print(
             "matched={0.matched_count} sent={0.sent_count} duplicates={0.skipped_duplicate_count}".format(
@@ -308,6 +346,7 @@ def _run_fetch_mini_list(args: argparse.Namespace) -> None:
 
 def _run_monitor_command(args: argparse.Namespace) -> None:
     feishu_config = load_feishu_config(args.env) if args.send else None
+    ai_reviewer, ai_threshold = load_ai_reviewer(args.env)
     result = run_monitor_from_source(
         posts_path=args.posts,
         inschool_db_path=args.inschool_db,
@@ -317,6 +356,8 @@ def _run_monitor_command(args: argparse.Namespace) -> None:
         webhook_url=feishu_config.webhook_url if feishu_config else None,
         webhook_secret=feishu_config.webhook_secret if feishu_config else None,
         send_limit=args.send_limit,
+        ai_reviewer=ai_reviewer,
+        ai_confidence_threshold=ai_threshold,
     )
     safe_print(
         "scanned={0.scanned_count} matched={0.matched_count} sent={0.sent_count} duplicates={0.skipped_duplicate_count}".format(
@@ -329,6 +370,7 @@ def _run_mini_monitor_command(args: argparse.Namespace) -> None:
     config = load_zanao_mini_config(args.env)
     client = ZanaoMiniClient(config)
     feishu_config = load_feishu_config(args.env) if args.send else None
+    ai_reviewer, ai_threshold = load_ai_reviewer(args.env)
     result = run_mini_monitor_once(
         client=client,
         state_path=args.state,
@@ -338,6 +380,8 @@ def _run_mini_monitor_command(args: argparse.Namespace) -> None:
         webhook_url=feishu_config.webhook_url if feishu_config else None,
         webhook_secret=feishu_config.webhook_secret if feishu_config else None,
         send_limit=args.send_limit,
+        ai_reviewer=ai_reviewer,
+        ai_confidence_threshold=ai_threshold,
     )
     safe_print(
         "scanned={0.scanned_count} matched={0.matched_count} sent={0.sent_count} duplicates={0.skipped_duplicate_count}".format(
@@ -350,6 +394,7 @@ def _run_watch_mini_monitor_command(args: argparse.Namespace) -> None:
     config = load_zanao_mini_config(args.env)
     client = ZanaoMiniClient(config)
     feishu_config = load_feishu_config(args.env) if not args.dry_run else None
+    ai_reviewer, ai_threshold = load_ai_reviewer(args.env)
 
     cycle = 0
     while True:
@@ -362,6 +407,8 @@ def _run_watch_mini_monitor_command(args: argparse.Namespace) -> None:
             webhook_url=feishu_config.webhook_url if feishu_config else None,
             webhook_secret=feishu_config.webhook_secret if feishu_config else None,
             send_limit=args.send_limit,
+            ai_reviewer=ai_reviewer,
+            ai_confidence_threshold=ai_threshold,
         )
         cycle += 1
         safe_print(

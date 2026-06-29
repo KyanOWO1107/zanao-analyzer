@@ -6,6 +6,7 @@ import pytest
 from zanao_monitor.cli import build_parser, format_recent_matches, run_mini_monitor_once, run_watch_mini_monitor, safe_console_text, run_monitor, run_monitor_from_source
 from zanao_monitor.cli import load_feishu_config, run_monitor_with_posts
 from zanao_monitor.cli import format_posts_for_dry_run
+from zanao_monitor.ai import AiReview
 from zanao_monitor.models import Post
 
 
@@ -227,6 +228,109 @@ def test_run_monitor_with_posts_records_scan_observability(tmp_path):
     assert runs[0].dry_run is True
     assert matches[0].post_id == "p1"
     assert matches[0].status == "preview"
+
+
+def test_run_monitor_with_posts_applies_ai_reviewer_when_enabled(tmp_path):
+    state_path = tmp_path / "state.db"
+    posts = [
+        Post(
+            source="zanao-mini",
+            post_id="p1",
+            title="求题库",
+            content="求这门课的题库和实验报告",
+            author="alice",
+            created_at=1710000000,
+        )
+    ]
+
+    def reviewer(match):
+        return AiReview(
+            is_target=True,
+            category=match.category,
+            intent=match.intent,
+            confidence=0.9,
+            reason="明确求资料",
+        )
+
+    result = run_monitor_with_posts(
+        posts=posts,
+        state_path=state_path,
+        dry_run=True,
+        ai_reviewer=reviewer,
+        ai_confidence_threshold=0.7,
+    )
+
+    assert result.matched_count == 1
+    assert result.sent_count == 1
+
+
+def test_run_monitor_with_posts_skips_ai_rejected_matches(tmp_path):
+    state_path = tmp_path / "state.db"
+    posts = [
+        Post(
+            source="zanao-mini",
+            post_id="p1",
+            title="求题库",
+            content="求这门课的题库和实验报告",
+            author="alice",
+            created_at=1710000000,
+        )
+    ]
+
+    def reviewer(match):
+        return AiReview(
+            is_target=False,
+            category=match.category,
+            intent=match.intent,
+            confidence=0.9,
+            reason="不是目标",
+        )
+
+    result = run_monitor_with_posts(
+        posts=posts,
+        state_path=state_path,
+        dry_run=True,
+        ai_reviewer=reviewer,
+        ai_confidence_threshold=0.7,
+    )
+
+    from zanao_monitor.state import NotificationState
+
+    matches = NotificationState(state_path).list_recent_scan_matches(limit=1)
+    assert result.matched_count == 1
+    assert result.sent_count == 0
+    assert matches[0].status == "ai_rejected"
+
+
+def test_run_monitor_with_posts_skips_ai_errors(tmp_path):
+    state_path = tmp_path / "state.db"
+    posts = [
+        Post(
+            source="zanao-mini",
+            post_id="p1",
+            title="求题库",
+            content="求这门课的题库和实验报告",
+            author="alice",
+            created_at=1710000000,
+        )
+    ]
+
+    def reviewer(match):
+        raise RuntimeError("ai unavailable")
+
+    result = run_monitor_with_posts(
+        posts=posts,
+        state_path=state_path,
+        dry_run=True,
+        ai_reviewer=reviewer,
+        ai_confidence_threshold=0.7,
+    )
+
+    from zanao_monitor.state import NotificationState
+
+    matches = NotificationState(state_path).list_recent_scan_matches(limit=1)
+    assert result.sent_count == 0
+    assert matches[0].status == "ai_error"
 
 
 def test_load_feishu_config_reads_env_file_when_process_env_missing(tmp_path, monkeypatch):

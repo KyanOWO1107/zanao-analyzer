@@ -107,6 +107,24 @@ python -m zanao_monitor.cli list-recent-matches --state data/monitor_state.db --
 
 每次监控运行都会在状态库里记录扫描汇总和命中候选，便于之后观察误报、漏报和推送效果。
 
+## AI 二级判断
+
+默认不启用 AI。需要远端 AI 平台二次判断时看：
+
+```text
+docs/ai-review.md
+```
+
+AI 只处理规则已经命中的候选，不会发送赞噢登录态或飞书密钥。
+
+## QQ 机器人
+
+QQ 机器人接入方案见：
+
+```text
+docs/qq-bot-integration.md
+```
+
 ## 定时运行
 
 Windows 和 Linux 的定时运行方式见：
