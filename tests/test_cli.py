@@ -405,6 +405,28 @@ def test_load_extra_notifiers_reads_enabled_astrbot_config(tmp_path, monkeypatch
     assert len(notifiers) == 1
 
 
+def test_load_extra_notifiers_reads_enabled_astrbot_im_config(tmp_path, monkeypatch):
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "\n".join(
+            (
+                "ASTRBOT_ENABLED=true",
+                "ASTRBOT_IM_ENABLED=true",
+                "ASTRBOT_BASE_URL=http://127.0.0.1:6185",
+                "ASTRBOT_API_KEY=panel-key",
+                "ASTRBOT_UMO=aiocqhttp:GroupMessage:456",
+            )
+        ),
+        encoding="utf-8",
+    )
+    for key in ("ASTRBOT_ENABLED", "ASTRBOT_IM_ENABLED", "ASTRBOT_BASE_URL", "ASTRBOT_API_KEY", "ASTRBOT_UMO"):
+        monkeypatch.delenv(key, raising=False)
+
+    notifiers = load_extra_notifiers(env_path)
+
+    assert len(notifiers) == 1
+
+
 def test_build_parser_allows_test_feishu_command():
     parser = build_parser()
 

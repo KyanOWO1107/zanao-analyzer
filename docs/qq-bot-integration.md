@@ -91,47 +91,53 @@ POST /send_private_msg
 
 实际字段以 LLBot 配置和版本为准。
 
-## 方案 C: AstrBot 插件
+## 方案 C: AstrBot OpenAPI IM
 
-如果 AstrBot 方便扩展，建议在 AstrBot 侧写一个小插件，暴露本地 HTTP 入口：
+当前测试环境的 AstrBot 对插件扩展 POST 路由返回 `405 Method Not Allowed`，所以项目侧优先使用 AstrBot 官方 IM 接口：
 
 ```http
-POST http://127.0.0.1:port/zanao-notify
+POST http://127.0.0.1:6185/api/v1/im/message
+X-API-Key: <AstrBot API Key>
+Content-Type: application/json
 ```
 
-插件收到请求后调用 AstrBot 自己的消息发送能力。这样本项目不需要知道 AstrBot 内部事件和适配器细节，只对一个稳定 HTTP 接口发消息。
+请求体：
 
-当前已经为本地测试准备了独立插件仓库，不放在主项目 Git 仓库中：
+```json
+{
+  "umo": "unified_msg_origin",
+  "message": "赞噢需求提醒..."
+}
+```
+
+仍保留一个独立插件仓库，不放在主项目 Git 仓库中，用于在 QQ 会话中显示当前会话的 `UMO`：
 
 ```text
 E:\Workplace\Projects\zanao-astrbot-notify-plugin
 ```
 
-插件接口：
-
-```text
-POST /zanao/notify
-```
-
-主项目 `.env`：
-
-```text
-ASTRBOT_ENABLED=true
-ASTRBOT_WEBHOOK_URL=http://127.0.0.1:6185/zanao/notify
-ASTRBOT_TOKEN=和插件中设置的一致
-ASTRBOT_TIMEOUT_SECONDS=10
-```
-
-在接收通知的 QQ 群或私聊里先发送：
+在接收通知的 QQ 群或私聊里发送：
 
 ```text
 /zanao_bind
 ```
 
-再设置 token：
+插件会返回当前会话的 `UMO`，填入主项目 `.env`：
 
 ```text
-/zanao_token your-secret-token
+ASTRBOT_ENABLED=true
+ASTRBOT_IM_ENABLED=true
+ASTRBOT_BASE_URL=http://127.0.0.1:6185
+ASTRBOT_API_KEY=AstrBot 面板 OpenAPI Key
+ASTRBOT_UMO=/zanao_bind 返回的 UMO
+ASTRBOT_TIMEOUT_SECONDS=10
+```
+
+旧的插件 webhook 字段只在 AstrBot 支持插件扩展 POST 时使用：
+
+```text
+ASTRBOT_WEBHOOK_URL=
+ASTRBOT_TOKEN=
 ```
 
 ## 建议

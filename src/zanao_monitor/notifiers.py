@@ -14,6 +14,10 @@ class AstrBotConfig:
     webhook_url: str
     token: str
     timeout_seconds: int
+    api_key: str = ""
+    im_enabled: bool = False
+    base_url: str = ""
+    umo: str = ""
 
 
 def _env_value(values: dict[str, str], key: str, default: str = "") -> str:
@@ -23,11 +27,16 @@ def _env_value(values: dict[str, str], key: str, default: str = "") -> str:
 def load_astrbot_config(env_path: str | Path = ".env") -> AstrBotConfig:
     values = read_env_file(env_path)
     enabled = _env_value(values, "ASTRBOT_ENABLED", "false").lower() in ("1", "true", "yes", "on")
+    im_enabled = _env_value(values, "ASTRBOT_IM_ENABLED", "false").lower() in ("1", "true", "yes", "on")
     return AstrBotConfig(
         enabled=enabled,
         webhook_url=_env_value(values, "ASTRBOT_WEBHOOK_URL", ""),
         token=_env_value(values, "ASTRBOT_TOKEN", ""),
         timeout_seconds=int(_env_value(values, "ASTRBOT_TIMEOUT_SECONDS", "10")),
+        api_key=_env_value(values, "ASTRBOT_API_KEY", ""),
+        im_enabled=im_enabled,
+        base_url=_env_value(values, "ASTRBOT_BASE_URL", ""),
+        umo=_env_value(values, "ASTRBOT_UMO", ""),
     )
 
 
@@ -50,12 +59,35 @@ def build_notification_text(match: DemandMatch) -> str:
 def send_astrbot_message(config: AstrBotConfig, text: str) -> None:
     if not config.enabled:
         return
+    headers = {"X-API-Key": config.api_key} if config.api_key else {}
+
+    if config.im_enabled:
+        if not config.base_url or not config.api_key or not config.umo:
+            raise ValueError("ASTRBOT_BASE_URL, ASTRBOT_API_KEY, and ASTRBOT_UMO are required when AstrBot IM is enabled")
+        response = requests.post(
+            f"{config.base_url.rstrip('/')}/api/v1/im/message",
+            json={"umo": config.umo, "message": text},
+            headers=headers,
+            timeout=config.timeout_seconds,
+        )
+        response.raise_for_status()
+        try:
+            body = response.json()
+        except ValueError:
+            return
+        if not isinstance(body, dict):
+            return
+        if body.get("status", "ok") == "ok":
+            return
+        raise ValueError(str(body.get("message", "AstrBot IM API returned an error")))
+
     if not config.webhook_url or not config.token:
         raise ValueError("ASTRBOT_WEBHOOK_URL and ASTRBOT_TOKEN are required when AstrBot is enabled")
 
     response = requests.post(
         config.webhook_url,
         json={"token": config.token, "text": text},
+        headers=headers,
         timeout=config.timeout_seconds,
     )
     response.raise_for_status()
