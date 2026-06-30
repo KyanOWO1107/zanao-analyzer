@@ -101,6 +101,39 @@ POST http://127.0.0.1:port/zanao-notify
 
 插件收到请求后调用 AstrBot 自己的消息发送能力。这样本项目不需要知道 AstrBot 内部事件和适配器细节，只对一个稳定 HTTP 接口发消息。
 
+当前已经为本地测试准备了独立插件仓库，不放在主项目 Git 仓库中：
+
+```text
+E:\Workplace\Projects\zanao-astrbot-notify-plugin
+```
+
+插件接口：
+
+```text
+POST /zanao/notify
+```
+
+主项目 `.env`：
+
+```text
+ASTRBOT_ENABLED=true
+ASTRBOT_WEBHOOK_URL=http://127.0.0.1:6185/zanao/notify
+ASTRBOT_TOKEN=和插件中设置的一致
+ASTRBOT_TIMEOUT_SECONDS=10
+```
+
+在接收通知的 QQ 群或私聊里先发送：
+
+```text
+/zanao_bind
+```
+
+再设置 token：
+
+```text
+/zanao_token your-secret-token
+```
+
 ## 建议
 
 当前优先推荐方案 A 或 C：让 QQ 机器人侧提供一个简单 HTTP webhook。

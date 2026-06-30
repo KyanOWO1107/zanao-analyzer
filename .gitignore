@@ -5,6 +5,10 @@ __pycache__/
 data/
 logs/
 docs/private-capture/
+docs/capture-analysis.md
+docs/env-fields.md
+docs/zanao-parameter-capture.md
+memory/
 .env
 @private/
 Zanao-LLM-Analyzer/

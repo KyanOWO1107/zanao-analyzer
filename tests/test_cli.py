@@ -3,7 +3,7 @@ import sqlite3
 
 import pytest
 
-from zanao_monitor.cli import build_parser, format_recent_matches, run_mini_monitor_once, run_watch_mini_monitor, safe_console_text, run_monitor, run_monitor_from_source
+from zanao_monitor.cli import build_parser, format_recent_matches, load_extra_notifiers, run_mini_monitor_once, run_watch_mini_monitor, safe_console_text, run_monitor, run_monitor_from_source
 from zanao_monitor.cli import load_feishu_config, run_monitor_with_posts
 from zanao_monitor.cli import format_posts_for_dry_run
 from zanao_monitor.ai import AiReview
@@ -385,6 +385,26 @@ def test_load_feishu_config_requires_webhook_url(tmp_path, monkeypatch):
     assert "FEISHU_WEBHOOK_URL" in str(error.value)
 
 
+def test_load_extra_notifiers_reads_enabled_astrbot_config(tmp_path, monkeypatch):
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "\n".join(
+            (
+                "ASTRBOT_ENABLED=true",
+                "ASTRBOT_WEBHOOK_URL=http://127.0.0.1:6185/zanao/notify",
+                "ASTRBOT_TOKEN=test-token",
+            )
+        ),
+        encoding="utf-8",
+    )
+    for key in ("ASTRBOT_ENABLED", "ASTRBOT_WEBHOOK_URL", "ASTRBOT_TOKEN"):
+        monkeypatch.delenv(key, raising=False)
+
+    notifiers = load_extra_notifiers(env_path)
+
+    assert len(notifiers) == 1
+
+
 def test_build_parser_allows_test_feishu_command():
     parser = build_parser()
 
@@ -643,3 +663,34 @@ def test_run_monitor_with_posts_limits_real_sends_and_state_marks(tmp_path, monk
     assert len(sent_payloads) == 1
     assert preview_after_send.skipped_duplicate_count == 1
     assert [match.post.post_id for match in preview_after_send.matches_to_send] == ["p2"]
+
+
+def test_run_monitor_with_posts_can_send_to_extra_notifier(tmp_path, monkeypatch):
+    state_path = tmp_path / "state.db"
+    feishu_payloads = []
+    extra_messages = []
+    posts = [
+        Post(
+            source="zanao-mini",
+            post_id="p1",
+            title="求真题",
+            content="求高数真题",
+            author="alice",
+            created_at=1710000000,
+        )
+    ]
+
+    monkeypatch.setattr("zanao_monitor.cli.send_message", lambda webhook_url, payload: feishu_payloads.append(payload))
+
+    result = run_monitor_with_posts(
+        posts=posts,
+        state_path=state_path,
+        dry_run=False,
+        webhook_url="https://example.test/hook",
+        extra_notifiers=(extra_messages.append,),
+    )
+
+    assert result.sent_count == 1
+    assert len(feishu_payloads) == 1
+    assert len(extra_messages) == 1
+    assert "求真题" in extra_messages[0]

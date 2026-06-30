@@ -16,6 +16,7 @@ from zanao_monitor.feishu import (
     send_message,
 )
 from zanao_monitor.models import DemandMatch, Post
+from zanao_monitor.notifiers import build_notification_text, load_astrbot_config, send_astrbot_message
 from zanao_monitor.rules import classify_post
 from zanao_monitor.sources import load_inschool_posts
 from zanao_monitor.state import NotificationState
@@ -52,6 +53,14 @@ def load_ai_reviewer(env_path: str | Path = ".env") -> tuple[Callable[[DemandMat
     return reviewer.review if reviewer is not None else None, config.confidence_threshold
 
 
+def load_extra_notifiers(env_path: str | Path = ".env") -> tuple[Callable[[str], object], ...]:
+    astrbot_config = load_astrbot_config(env_path)
+    notifiers: list[Callable[[str], object]] = []
+    if astrbot_config.enabled:
+        notifiers.append(lambda text: send_astrbot_message(astrbot_config, text))
+    return tuple(notifiers)
+
+
 def _load_posts(posts_path: str | Path) -> list[Post]:
     raw = json.loads(Path(posts_path).read_text(encoding="utf-8"))
     if not isinstance(raw, list):
@@ -83,6 +92,7 @@ def run_monitor_with_posts(
     send_limit: int | None = None,
     ai_reviewer: Callable[[DemandMatch], AiReview] | None = None,
     ai_confidence_threshold: float = 0.7,
+    extra_notifiers: tuple[Callable[[str], object], ...] = (),
 ) -> RunResult:
     state = NotificationState(state_path)
     matched_count = 0
@@ -125,11 +135,16 @@ def run_monitor_with_posts(
 
         if not dry_run:
             if not webhook_url:
-                raise ValueError("webhook_url is required when dry_run is false")
-            payload = message
-            if webhook_secret:
-                payload = build_signed_payload(message, webhook_secret)
-            send_message(webhook_url, payload)
+                if not extra_notifiers:
+                    raise ValueError("webhook_url or extra_notifiers is required when dry_run is false")
+            if webhook_url:
+                payload = message
+                if webhook_secret:
+                    payload = build_signed_payload(message, webhook_secret)
+                send_message(webhook_url, payload)
+            notification_text = build_notification_text(match)
+            for notify in extra_notifiers:
+                notify(notification_text)
 
         state.mark_sent(post.source, post.post_id, match.category)
         sent_count += 1
@@ -165,6 +180,7 @@ def run_monitor(
     send_limit: int | None = None,
     ai_reviewer: Callable[[DemandMatch], AiReview] | None = None,
     ai_confidence_threshold: float = 0.7,
+    extra_notifiers: tuple[Callable[[str], object], ...] = (),
 ) -> RunResult:
     return run_monitor_with_posts(
         posts=posts,
@@ -175,6 +191,7 @@ def run_monitor(
         send_limit=send_limit,
         ai_reviewer=ai_reviewer,
         ai_confidence_threshold=ai_confidence_threshold,
+        extra_notifiers=extra_notifiers,
     )
 
 
@@ -189,6 +206,7 @@ def run_monitor_from_source(
     send_limit: int | None = None,
     ai_reviewer: Callable[[DemandMatch], AiReview] | None = None,
     ai_confidence_threshold: float = 0.7,
+    extra_notifiers: tuple[Callable[[str], object], ...] = (),
 ) -> RunResult:
     if posts_path and inschool_db_path:
         raise ValueError("choose either posts_path or inschool_db_path")
@@ -209,6 +227,7 @@ def run_monitor_from_source(
         send_limit=send_limit,
         ai_reviewer=ai_reviewer,
         ai_confidence_threshold=ai_confidence_threshold,
+        extra_notifiers=extra_notifiers,
     )
 
 
@@ -223,6 +242,7 @@ def run_mini_monitor_once(
     send_limit: int | None = None,
     ai_reviewer: Callable[[DemandMatch], AiReview] | None = None,
     ai_confidence_threshold: float = 0.7,
+    extra_notifiers: tuple[Callable[[str], object], ...] = (),
 ) -> RunResult:
     posts = client.fetch_thread_list(limit=limit, from_time=from_time)
     return run_monitor_with_posts(
@@ -234,6 +254,7 @@ def run_mini_monitor_once(
         send_limit=send_limit,
         ai_reviewer=ai_reviewer,
         ai_confidence_threshold=ai_confidence_threshold,
+        extra_notifiers=extra_notifiers,
     )
 
 
@@ -249,6 +270,7 @@ def run_watch_mini_monitor(
     send_limit: int | None = None,
     ai_reviewer: Callable[[DemandMatch], AiReview] | None = None,
     ai_confidence_threshold: float = 0.7,
+    extra_notifiers: tuple[Callable[[str], object], ...] = (),
     max_cycles: int | None = None,
     sleep_func: Callable[[int], object] = time.sleep,
 ) -> list[RunResult]:
@@ -266,6 +288,7 @@ def run_watch_mini_monitor(
             send_limit=send_limit,
             ai_reviewer=ai_reviewer,
             ai_confidence_threshold=ai_confidence_threshold,
+            extra_notifiers=extra_notifiers,
         )
         results.append(result)
         cycle += 1
@@ -324,6 +347,7 @@ def _run_fetch_mini_list(args: argparse.Namespace) -> None:
     if args.match:
         feishu_config = load_feishu_config(args.env) if args.send else None
         ai_reviewer, ai_threshold = load_ai_reviewer(args.env)
+        extra_notifiers = load_extra_notifiers(args.env) if args.send else ()
         result = run_monitor_with_posts(
             posts=posts,
             state_path=args.state,
@@ -333,6 +357,7 @@ def _run_fetch_mini_list(args: argparse.Namespace) -> None:
             send_limit=args.send_limit,
             ai_reviewer=ai_reviewer,
             ai_confidence_threshold=ai_threshold,
+            extra_notifiers=extra_notifiers,
         )
         safe_print(
             "matched={0.matched_count} sent={0.sent_count} duplicates={0.skipped_duplicate_count}".format(
@@ -347,6 +372,7 @@ def _run_fetch_mini_list(args: argparse.Namespace) -> None:
 def _run_monitor_command(args: argparse.Namespace) -> None:
     feishu_config = load_feishu_config(args.env) if args.send else None
     ai_reviewer, ai_threshold = load_ai_reviewer(args.env)
+    extra_notifiers = load_extra_notifiers(args.env) if args.send else ()
     result = run_monitor_from_source(
         posts_path=args.posts,
         inschool_db_path=args.inschool_db,
@@ -358,6 +384,7 @@ def _run_monitor_command(args: argparse.Namespace) -> None:
         send_limit=args.send_limit,
         ai_reviewer=ai_reviewer,
         ai_confidence_threshold=ai_threshold,
+        extra_notifiers=extra_notifiers,
     )
     safe_print(
         "scanned={0.scanned_count} matched={0.matched_count} sent={0.sent_count} duplicates={0.skipped_duplicate_count}".format(
@@ -371,6 +398,7 @@ def _run_mini_monitor_command(args: argparse.Namespace) -> None:
     client = ZanaoMiniClient(config)
     feishu_config = load_feishu_config(args.env) if args.send else None
     ai_reviewer, ai_threshold = load_ai_reviewer(args.env)
+    extra_notifiers = load_extra_notifiers(args.env) if args.send else ()
     result = run_mini_monitor_once(
         client=client,
         state_path=args.state,
@@ -382,6 +410,7 @@ def _run_mini_monitor_command(args: argparse.Namespace) -> None:
         send_limit=args.send_limit,
         ai_reviewer=ai_reviewer,
         ai_confidence_threshold=ai_threshold,
+        extra_notifiers=extra_notifiers,
     )
     safe_print(
         "scanned={0.scanned_count} matched={0.matched_count} sent={0.sent_count} duplicates={0.skipped_duplicate_count}".format(
@@ -395,6 +424,7 @@ def _run_watch_mini_monitor_command(args: argparse.Namespace) -> None:
     client = ZanaoMiniClient(config)
     feishu_config = load_feishu_config(args.env) if not args.dry_run else None
     ai_reviewer, ai_threshold = load_ai_reviewer(args.env)
+    extra_notifiers = load_extra_notifiers(args.env) if not args.dry_run else ()
 
     cycle = 0
     while True:
@@ -409,6 +439,7 @@ def _run_watch_mini_monitor_command(args: argparse.Namespace) -> None:
             send_limit=args.send_limit,
             ai_reviewer=ai_reviewer,
             ai_confidence_threshold=ai_threshold,
+            extra_notifiers=extra_notifiers,
         )
         cycle += 1
         safe_print(

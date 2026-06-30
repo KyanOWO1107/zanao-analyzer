@@ -7,6 +7,7 @@ from collections.abc import Mapping
 import requests
 
 from zanao_monitor.models import DemandMatch
+from zanao_monitor.notifiers import build_notification_text
 
 JsonScalar = str | int | float | bool | None
 JsonValue = JsonScalar | dict[str, "JsonValue"] | list["JsonValue"]
@@ -36,20 +37,7 @@ def build_plain_text_message(text: str) -> JsonObject:
 
 
 def build_text_message(match: DemandMatch) -> JsonObject:
-    post = match.post
-    text = "\n".join(
-        (
-            "赞噢需求提醒",
-            f"类别: {match.category}",
-            f"意图: {match.intent}",
-            f"关键词: {', '.join(match.keywords)}",
-            f"标题: {post.title}",
-            f"作者: {post.author}",
-            f"来源: {post.source}/{post.post_id}",
-            f"内容: {post.content[:180]}",
-        )
-    )
-    return build_plain_text_message(text)
+    return build_plain_text_message(build_notification_text(match))
 
 
 def send_message(webhook_url: str, payload: Mapping[str, JsonValue], timeout_seconds: int = 10) -> None:

@@ -125,6 +125,12 @@ QQ 机器人接入方案见：
 docs/qq-bot-integration.md
 ```
 
+本地 AstrBot 测试插件在主仓库外：
+
+```text
+E:\Workplace\Projects\zanao-astrbot-notify-plugin
+```
+
 ## 定时运行
 
 Windows 和 Linux 的定时运行方式见：

@@ -38,6 +38,8 @@ def test_ai_and_qq_docs_are_linked_from_readme():
     assert "docs/ai-review.md" in readme
     assert "docs/qq-bot-integration.md" in readme
     assert "AI_ENABLED=false" in env_example
+    assert "ASTRBOT_ENABLED=false" in env_example
     assert "openai-compatible" in ai_doc
     assert "LLBot" in qq_doc
     assert "AstrBot" in qq_doc
+    assert "zanao-astrbot-notify-plugin" in qq_doc
